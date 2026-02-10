@@ -17,7 +17,7 @@ async function importarLeads() {
             const telefono = lead.phone || lead.phoneNumber;
             const web = lead.website || lead.url;
             const direccion = lead.address;
-            
+
             // Solo nos interesan los que tienen WEB (para buscar el mail después)
             // Opcional: Podés quitar este IF si querés guardar todos igual.
             if (!web) {

@@ -18,6 +18,7 @@
   "homepage": "https://github.com/MarcoBarzola22/sistema-agro-leads#readme",
   "dependencies": {
     "dotenv": "^17.2.4",
-    "pg": "^8.18.0"
+    "pg": "^8.18.0",
+    "puppeteer": "^24.37.2"
   }
 }
