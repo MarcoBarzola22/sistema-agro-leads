@@ -1,20 +1,16 @@
 [
   {
-    "title": "Veterinaria El Gaucho",
-    "phone": "+54 2657 123456",
-    "website": "http://www.veterinariaelgaucho.com.ar",
-    "address": "Av. Mitre 123, Villa Mercedes"
-  },
-  {
-    "title": "Agroinsumos San Luis",
-    "phone": "+54 2657 987654",
-    "website": "http://www.agroinsumossl.com",
-    "address": "Ruta 7 km 700"
-  },
-  {
-    "title": "Kiosco Pepe (Sin Web)",
+    "title": "Bayer Crop Science",
+    "website": "https://www.bayer.com/es-ar/agricultura",
+    "address": "Prueba Real 1",
     "phone": "123",
-    "website": null,
-    "address": "Esquina"
+    "url": "http://maps..."
+  },
+  {
+    "title": "Don Mario Semillas",
+    "website": "https://www.donmario.com/",
+    "address": "Prueba Real 2",
+    "phone": "456",
+    "url": "http://maps..."
   }
 ]
