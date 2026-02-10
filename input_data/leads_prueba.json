@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Veterinaria El Gaucho",
+    "phone": "+54 2657 123456",
+    "website": "http://www.veterinariaelgaucho.com.ar",
+    "address": "Av. Mitre 123, Villa Mercedes"
+  },
+  {
+    "title": "Agroinsumos San Luis",
+    "phone": "+54 2657 987654",
+    "website": "http://www.agroinsumossl.com",
+    "address": "Ruta 7 km 700"
+  },
+  {
+    "title": "Kiosco Pepe (Sin Web)",
+    "phone": "123",
+    "website": null,
+    "address": "Esquina"
+  }
+]
