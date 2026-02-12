@@ -9,16 +9,14 @@ const client = new ApifyClient({
 
 const ACTOR_ID = 'lukaskrivka/google-maps-with-contact-details';
 
-// 🗺️ ESTRATEGIA DE BARRIDO PROVINCIAL
-// Dividimos la provincia en puntos estratégicos para no dejar nada afuera.
 const ZONAS = [
-    "Villa Mercedes, San Luis",      // Zona Este / Centro
-    "San Luis Capital, Argentina",   // Zona Oeste
-    "Merlo, San Luis",               // Zona Norte (Turismo/Agro)
-    "Santa Rosa de Conlara, San Luis", // Zona Norte (Fuerte en Agro/Maíz)
-    "Buena Esperanza, San Luis",     // Zona Sur (Ganadería pura)
-    "Justo Daract, San Luis",        // Zona Límite Cba
-    "Quines, San Luis"               // Zona Norte/Oeste (Papa/Riego)
+    "Villa Mercedes, San Luis",
+    "San Luis Capital, Argentina",
+    "Merlo, San Luis",
+    "Santa Rosa de Conlara, San Luis",
+    "Buena Esperanza, San Luis",
+    "Justo Daract, San Luis",
+    "Quines, San Luis"
 ];
 
 const RUBROS = [
@@ -34,48 +32,50 @@ const RUBROS = [
 ];
 
 (async () => {
-    console.log(`🚜 EL MINERO: Iniciando recorrido por toda la provincia de SAN LUIS...`);
+    console.log(`🚜 EL MINERO: Iniciando recorrido provincial rápido (2 min por zona)...`);
     
-    // Carpeta de guardado
     const rutaCarpeta = path.join(__dirname, 'input_data');
     if (!fs.existsSync(rutaCarpeta)) fs.mkdirSync(rutaCarpeta);
 
-    // BUCLE: Recorremos cada zona una por una
     for (const zona of ZONAS) {
-        console.log(`\n📍 Viajando a: ${zona}...`);
+        console.log(`\n📍 Zona actual: ${zona}`);
 
         const INPUT_DEL_ACTOR = {
             searchStringsArray: RUBROS,
-            locationQuery: zona, // Acá va cambiando la ciudad automáticamente
+            locationQuery: zona,
             country: "Argentina",
-            maxCrawledPlaces: 10, // 10 por rubro en CADA zona (Total: 7 zonas * 9 rubros * 10 = ~600 leads)
+            maxCrawledPlaces: 20, // Traerá hasta 20 por zona
             language: "es", 
-            zoom: 12, // Zoom medio para ver ciudad + campos aledaños
+            zoom: 12, 
             skipClosedPlaces: true,
+            // Mejora la variedad de resultados buscando por descripciones
+            searchByCaptions: true, 
+            includeReviews: false
         };
 
         try {
-            // Ejecutamos el actor para esta zona
-            const run = await client.actor(ACTOR_ID).call(INPUT_DEL_ACTOR);
-            console.log(`   ⏳ Procesando zona (Run ID: ${run.id})...`);
+            // Límite estricto de 2 minutos (120 seg) y 512MB de memoria
+            const run = await client.actor(ACTOR_ID).call(INPUT_DEL_ACTOR, {
+                memoryMbytes: 512, 
+                timeoutSecs: 120   
+            });
+
+            console.log(`   ⏳ Procesando zona (ID: ${run.id}) - Tiempo límite: 120s`);
 
             const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
             if (items.length > 0) {
                 console.log(`   ✅ Encontrados ${items.length} leads en ${zona}.`);
 
-                // Limpieza
                 const leadsLimpios = items.map(item => ({
                     title: item.title || "Sin Nombre",
                     phone: item.phone || item.phoneNumber || null, 
                     website: item.website || null,
                     address: item.address || null,
-                    city: item.city || zona, // Si no trae ciudad, ponemos la zona que buscamos
+                    city: item.city || zona,
                     url_maps: item.url || null,
                 }));
 
-                // Guardamos UN archivo por zona para tener orden
-                // Reemplazamos espacios y comas para el nombre del archivo
                 const nombreZonaSafe = zona.replace(/[^a-z0-9]/gi, '_').toLowerCase(); 
                 const nombreArchivo = `leads_${nombreZonaSafe}_${Date.now()}.json`;
                 const rutaArchivo = path.join(rutaCarpeta, nombreArchivo);
@@ -83,13 +83,13 @@ const RUBROS = [
                 fs.writeFileSync(rutaArchivo, JSON.stringify(leadsLimpios, null, 2));
                 console.log(`   💾 Guardado en: ${nombreArchivo}`);
             } else {
-                console.log(`   ⚠️ No se encontró nada en ${zona} (o Apify saturado).`);
+                console.log(`   ⚠️ Sin resultados en ${zona} tras 2 minutos.`);
             }
 
         } catch (error) {
-            console.error(`   ❌ Error en ${zona}:`, error.message);
+            console.error(`   ❌ Error o Tiempo Agotado en ${zona}:`, error.message);
         }
     }
 
-    console.log("\n🏁 ¡Recorrido provincial terminado!");
+    console.log("\n🏁 Recorrido terminado. Podés revisar /input_data");
 })();
