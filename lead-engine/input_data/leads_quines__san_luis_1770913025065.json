@@ -1,0 +1,34 @@
+[
+  {
+    "title": "El chañar",
+    "phone": null,
+    "website": null,
+    "address": "Moreno 523, D5711 Quines, San Luis, Argentina",
+    "city": "Quines",
+    "url_maps": "https://www.google.com/maps/search/?api=1&query=El%20cha%C3%B1ar&query_place_id=ChIJOz-UGwBX05UREgCDbq3d4jk"
+  },
+  {
+    "title": "Veterinaria la Tranquera",
+    "phone": "+54 2651 47-0232",
+    "website": null,
+    "address": "25 de Mayo 421, D5711 Quines, San Luis, Argentina",
+    "city": "Quines",
+    "url_maps": "https://www.google.com/maps/search/?api=1&query=Veterinaria%20la%20Tranquera&query_place_id=ChIJ0yEo8Q5X05URaBqif7u4HnY"
+  },
+  {
+    "title": "agrovet el chañar",
+    "phone": "+54 266 458-8464",
+    "website": null,
+    "address": "D5711 Quines, San Luis, Argentina",
+    "city": "Quines",
+    "url_maps": "https://www.google.com/maps/search/?api=1&query=agrovet%20el%20cha%C3%B1ar&query_place_id=ChIJFa1p4qZX05URWqVVvuixA8Q"
+  },
+  {
+    "title": "Predio Santa Maria",
+    "phone": null,
+    "website": null,
+    "address": "D5711 Quines, San Luis, Argentina",
+    "city": "Quines",
+    "url_maps": "https://www.google.com/maps/search/?api=1&query=Predio%20Santa%20Maria&query_place_id=ChIJaw3mVgBX05UR8pdjezunRQo"
+  }
+]

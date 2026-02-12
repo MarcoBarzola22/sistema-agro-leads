@@ -31,9 +31,9 @@ function formatearParaWhatsapp(rawPhone) {
     console.log(`   ⚙️ Config: Máx ${CONFIG.MAX_LEADS} leads | Máx ${CONFIG.MAX_TIEMPO_MINUTOS} mins.`);
 
     // 1. Buscamos los leads (Usando el LÍMITE configurado)
-    // ⚠️ Asegúrate de que la tabla sea 'leads' o 'leads_agro' según tu base de datos
+    // ⚠️ CORREGIDO: Usamos 'leads_agro' que es tu tabla real
     const res = await pool.query(
-        `SELECT * FROM leads WHERE telefono IS NOT NULL AND link_whatsapp IS NULL LIMIT ${CONFIG.MAX_LEADS}`
+        `SELECT * FROM leads_agro WHERE telefono IS NOT NULL AND link_whatsapp IS NULL LIMIT ${CONFIG.MAX_LEADS}`
     );
     const leads = res.rows;
 
@@ -59,7 +59,8 @@ function formatearParaWhatsapp(rawPhone) {
             break; 
         }
 
-        console.log(`\n[${i + 1}/${leads.length}] Procesando: ${lead.nombre_empresa || lead.nombre_negocio}...`);
+        // CORREGIDO: Usamos nombre_negocio
+        console.log(`\n[${i + 1}/${leads.length}] Procesando: ${lead.nombre_negocio}...`);
 
         // --- 📍 LÓGICA DE UBICACIÓN (Nuevo) ---
         // Prioridad: Ciudad -> Provincia -> "su zona"
@@ -85,19 +86,20 @@ function formatearParaWhatsapp(rawPhone) {
                 const text = await page.evaluate(() => document.body.innerText.toLowerCase());
 
                 // Lógica de Ganchos (Hooks) con Ubicación
-                if (text.includes("silo") || text.includes("acopio") || text.includes("cereal")) {
-                    mensaje = `Hola ${lead.nombre_empresa}, vi que tienen planta en ${ubicacion}. Queríamos comentarles sobre una solución para bajar costos de energía en los silos. ¿Les podría enviar info?`;
+                // CORREGIDO: Usamos lead.nombre_negocio en los mensajes
+                if (text.includes("veterinaria") || text.includes("acopio") || text.includes("tambo")) {
+                    mensaje = `Hola ${lead.nombre_negocio}, vi que tienen planta en ${ubicacion}. Queríamos comentarles sobre una solución para bajar costos de energía en los silos. ¿Les podría enviar info?`;
                 } else if (text.includes("feedlot") || text.includes("ganad") || text.includes("hacienda")) {
-                    mensaje = `Hola gente de ${lead.nombre_empresa}, vi sus instalaciones en ${ubicacion}. Tenemos un sistema de bombeo solar ideal para aguadas que ahorra mucho combustible. ¿Les interesa ver un caso de éxito?`;
+                    mensaje = `Hola gente de ${lead.nombre_negocio}, vi sus instalaciones en ${ubicacion}. Tenemos un sistema de bombeo solar ideal para aguadas que ahorra mucho combustible. ¿Les interesa ver un caso de éxito?`;
                 } else {
-                    mensaje = `Hola ${lead.nombre_empresa}, estuve viendo su web y vi que están en ${ubicacion}. Somos Hidrosolar, ayudamos a empresas del agro a reducir costos eléctricos. ¿Con quién podría hablar del tema energía?`;
+                    mensaje = `Hola ${lead.nombre_negocio}, estuve viendo su web y vi que están en ${ubicacion}. Somos Hidrosolar, ayudamos a empresas del agro a reducir costos eléctricos. ¿Con quién podría hablar del tema energía?`;
                 }
             } catch (e) {
                 console.log(`   ⚠️ Web lenta o inaccesible (Timeout de ${CONFIG.TIMEOUT_PAGINA}ms). Usando genérico.`);
-                mensaje = `Hola ${lead.nombre_empresa}, los encontré en la guía de empresas de ${ubicacion}. Somos Hidrosolar, especialistas en energía para el agro. ¿Les podría dejar una breve presentación?`;
+                mensaje = `Hola ${lead.nombre_negocio}, los encontré en la guía de empresas de ${ubicacion}. Somos Hidrosolar, especialistas en energía para el agro. ¿Les podría dejar una breve presentación?`;
             }
         } else {
-            mensaje = `Hola ${lead.nombre_empresa}, te escribo porque trabajamos con varios campos en la zona de ${ubicacion}. Somos Hidrosolar. ¿Te podría comentar brevemente cómo bajar costos de energía en el campo?`;
+            mensaje = `Hola ${lead.nombre_negocio}, te escribo porque trabajamos con varios campos en la zona de ${ubicacion}. Somos Hidrosolar. ¿Te podría comentar brevemente cómo bajar costos de energía en el campo?`;
         }
 
         // Generar Link
@@ -105,8 +107,9 @@ function formatearParaWhatsapp(rawPhone) {
         const linkFinal = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
 
         // Guardar en DB
+        // CORREGIDO: Usamos leads_agro
         await pool.query(
-            "UPDATE leads SET link_whatsapp = $1, notas_hook = $2 WHERE id = $3",
+            "UPDATE leads_agro SET link_whatsapp = $1, notas_hook = $2 WHERE id = $3",
             [linkFinal, mensaje, lead.id]
         );
         console.log(`   ✅ Link generado.`);

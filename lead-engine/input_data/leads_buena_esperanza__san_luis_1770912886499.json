@@ -1,0 +1,26 @@
+[
+  {
+    "title": "Veterinaria El Molino",
+    "phone": null,
+    "website": null,
+    "address": "1088, D6277 Buena Esperanza, San Luis, Argentina",
+    "city": "Buena Esperanza",
+    "url_maps": "https://www.google.com/maps/search/?api=1&query=Veterinaria%20El%20Molino&query_place_id=ChIJpbGHWVl52pURKQGxhnXHMKk"
+  },
+  {
+    "title": "Veterinaria \"El Ciervo\"",
+    "phone": null,
+    "website": null,
+    "address": "San Martin, D6277 Buena Esperanza, San Luis, Argentina",
+    "city": "Buena Esperanza",
+    "url_maps": "https://www.google.com/maps/search/?api=1&query=Veterinaria%20%22El%20Ciervo%22&query_place_id=ChIJNR8ute172pURJYECNStZJvk"
+  },
+  {
+    "title": "MSinsumos",
+    "phone": "+54 2625 40-5901",
+    "website": "https://www.instagram.com/msinsumos/",
+    "address": "Acceso Cacique Payne S/N, D6277 Buena Esperanza, San Luis, Argentina",
+    "city": "Buena Esperanza",
+    "url_maps": "https://www.google.com/maps/search/?api=1&query=MSinsumos&query_place_id=ChIJsbWo-hl52pURkdLF5C1ZMAQ"
+  }
+]

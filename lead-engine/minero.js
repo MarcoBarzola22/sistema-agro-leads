@@ -17,6 +17,7 @@ const ZONAS = [
     "Buena Esperanza, San Luis",
     "Justo Daract, San Luis",
     "Quines, San Luis"
+    
 ];
 
 const RUBROS = [
@@ -28,7 +29,8 @@ const RUBROS = [
     "Agro",
     "Ganaderia",
     "Avicola",
-    "Criadero"
+    "Criadero",
+    "Silo"
 ];
 
 (async () => {
@@ -55,10 +57,7 @@ const RUBROS = [
 
         try {
             // Límite estricto de 2 minutos (120 seg) y 512MB de memoria
-            const run = await client.actor(ACTOR_ID).call(INPUT_DEL_ACTOR, {
-                memoryMbytes: 512, 
-                timeoutSecs: 120   
-            });
+            const run = await client.actor(ACTOR_ID).call(INPUT_DEL_ACTOR);
 
             console.log(`   ⏳ Procesando zona (ID: ${run.id}) - Tiempo límite: 120s`);
 
