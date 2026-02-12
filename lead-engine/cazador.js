@@ -1,130 +1,123 @@
 const puppeteer = require('puppeteer');
-const { pool } = require('./db');
+const { Pool } = require('pg');
+const { dbConfig } = require('./db');
 
-// DICCIONARIO AMPLIADO (Más palabras para detectar el rubro)
-const KEYWORDS = {
-    trayectoria: ['años', 'aniversario', 'fundada', 'trayectoria', 'historia', 'somos una empresa'],
-    silos: ['silo', 'acopio', 'planta', 'cereal', 'secadora', 'logística', 'granos'],
-    maquinaria: ['tractor', 'cosechadora', 'sembradora', 'john deere', 'case', 'new holland', 'massey', 'repuestos', 'agrícola'],
-    ganaderia: ['bovino', 'hacienda', 'feedlot', 'veterinaria', 'animales', 'nutrición animal'],
-    insumos: ['semillas', 'agroquímicos', 'fertilizantes', 'fitosanitarios', 'protección de cultivos', 'bayer', 'syngenta'],
-    genetica: ['genética', 'variedades', 'soja', 'maíz', 'trigo', 'rendimiento', 'biotecnología']
+// --- 🎛️ CENTRO DE CONTROL (Configura aquí tus límites) ---
+const CONFIG = {
+    MAX_LEADS: 10,           // 🛑 Límite de cantidad: ¿Cuántos procesamos hoy?
+    MAX_TIEMPO_MINUTOS: 10,  // ⏰ Límite de tiempo: Si tarda más de X minutos, se apaga.
+    TIMEOUT_PAGINA: 15000,   // ⏳ Paciencia por web: Esperar máx 15 seg a que cargue una página.
+    ESPERA_ENTRE_LEADS: 3000 // 🐢 Pausa: Esperar 3 seg entre cada uno (anti-bloqueo).
 };
 
-async function cazarLeads() {
-    console.log("🦅 Iniciando el Cazador V2.0...");
-    
-    // 1. MEJORA DE MEMORIA: Solo traemos los que NO han sido procesados ni dieron error
-    // Usamos el campo 'estado' para filtrar.
-    // Asumimos que los nuevos vienen con estado 'nuevo' o 'apify_maps'
-    const res = await pool.query(`
-        SELECT id, nombre_negocio, website 
-        FROM leads_agro 
-        WHERE website IS NOT NULL 
-        AND (estado = 'nuevo' OR estado = 'apify_maps')
-        LIMIT 10
-    `);
-    
+const pool = new Pool(dbConfig);
+
+// Función auxiliar para limpiar teléfonos (Misma lógica anterior)
+function formatearParaWhatsapp(rawPhone) {
+    if (!rawPhone) return null;
+    let numero = rawPhone.replace(/\D/g, '');
+    if (numero.startsWith('549')) return numero;
+    if (numero.startsWith('0')) numero = numero.substring(1);
+    if (numero.length === 10) return `549${numero}`;
+    if (numero.startsWith('54') && !numero.startsWith('549')) return `549${numero.substring(2)}`;
+    return numero;
+}
+
+(async () => {
+    const tiempoInicio = Date.now();
+    const tiempoLimiteMs = CONFIG.MAX_TIEMPO_MINUTOS * 60 * 1000;
+
+    console.log(`🦅 CAZADOR V3 (Con Ubicación): Iniciando...`);
+    console.log(`   ⚙️ Config: Máx ${CONFIG.MAX_LEADS} leads | Máx ${CONFIG.MAX_TIEMPO_MINUTOS} mins.`);
+
+    // 1. Buscamos los leads (Usando el LÍMITE configurado)
+    // ⚠️ Asegúrate de que la tabla sea 'leads' o 'leads_agro' según tu base de datos
+    const res = await pool.query(
+        `SELECT * FROM leads WHERE telefono IS NOT NULL AND link_whatsapp IS NULL LIMIT ${CONFIG.MAX_LEADS}`
+    );
     const leads = res.rows;
 
     if (leads.length === 0) {
-        console.log("✅ No hay leads nuevos para procesar. ¡Todo al día!");
-        process.exit();
+        console.log("✅ No hay leads pendientes. A descansar.");
+        await pool.end();
+        return;
     }
 
-    console.log(`🎯 Objetivo: Procesar ${leads.length} webs nuevas.`);
+    console.log(`🎯 Objetivo: Procesar ${leads.length} leads encontrados.`);
 
-    const browser = await puppeteer.launch({ headless: "new" });
+    const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
-    
-    // User Agent móvil a veces revela botones de WhatsApp que en desktop no están
-    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+    // User Agent para parecer un humano real
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36');
 
-    for (const lead of leads) {
-        console.log(`\n🔍 Visitando: ${lead.nombre_negocio} (${lead.website})...`);
-
-        try {
-            // Timeout más corto (10s) para no perder tiempo si la web está muerta
-            await page.goto(lead.website, { waitUntil: 'domcontentloaded', timeout: 10000 });
-
-            // --- A. BÚSQUEDA PROFUNDA DE CONTACTO ---
-            
-            // 1. Buscar enlaces "mailto:" (Es más preciso que buscar texto suelto)
-            const mailtoLinks = await page.evaluate(() => {
-                const anchors = Array.from(document.querySelectorAll('a[href^="mailto:"]'));
-                return anchors.map(a => a.href.replace('mailto:', '').split('?')[0]);
-            });
-
-            // 2. Buscar enlaces de WhatsApp (wa.me o api.whatsapp)
-            const waLinks = await page.evaluate(() => {
-                const anchors = Array.from(document.querySelectorAll('a[href*="whatsapp"], a[href*="wa.me"]'));
-                return anchors.map(a => a.href);
-            });
-
-            // 3. Buscar texto en el cuerpo (Plan B si no hay mailto)
-            const text = await page.evaluate(() => document.body.innerText);
-            const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/gi;
-            const emailsTexto = text.match(emailRegex) || [];
-
-            // Unir y limpiar emails
-            const todosLosEmails = [...mailtoLinks, ...emailsTexto];
-            const emailsUnicos = [...new Set(todosLosEmails)]
-                .filter(e => !e.includes('.png') && !e.includes('.jpg') && !e.includes('wix') && e.length < 50);
-
-            const emailFinal = emailsUnicos.length > 0 ? emailsUnicos[0] : null;
-            const tieneWhatsApp = waLinks.length > 0;
-
-            // --- B. DETECTIVE DE DETALLES (Mejorado) ---
-            let detalle = "Vi sus servicios en la web"; 
-            const textoBajo = text.toLowerCase();
-
-            // Lógica de prioridad: Preferimos un dato específico sobre uno genérico
-            if (KEYWORDS.genetica.some(k => textoBajo.includes(k))) {
-                detalle = "Me interesa su propuesta en genética y semillas";
-            } else if (KEYWORDS.silos.some(k => textoBajo.includes(k))) {
-                detalle = "Vi que cuentan con planta de acopio propia";
-            } else if (KEYWORDS.insumos.some(k => textoBajo.includes(k))) {
-                detalle = "Vi que distribuyen insumos de primeras marcas";
-            } else if (KEYWORDS.maquinaria.some(k => textoBajo.includes(k))) {
-                detalle = "Vi que trabajan con maquinaria agrícola especializada";
-            } else if (KEYWORDS.ganaderia.some(k => textoBajo.includes(k))) {
-                detalle = "Vi que ofrecen servicios ganaderos completos";
-            } else if (KEYWORDS.trayectoria.some(k => textoBajo.includes(k))) {
-                detalle = "Impresionante la trayectoria que tienen en el rubro";
-            }
-
-            // --- RESULTADOS EN CONSOLA ---
-            if (emailFinal) console.log(`   ✅ Email: ${emailFinal}`);
-            else console.log(`   ⚠️ Email: No encontrado`);
-            
-            if (tieneWhatsApp) console.log(`   📱 WhatsApp detectado: SÍ`);
-            
-            console.log(`   💡 Detalle: "${detalle}"`);
-
-            // --- C. GUARDAR Y CAMBIAR ESTADO ---
-            // Si encontramos mail O whatsapp, lo consideramos "enriquecido". Si no, "visitado_sin_datos".
-            const nuevoEstado = (emailFinal || tieneWhatsApp) ? 'enriquecido' : 'visitado_sin_datos';
-            
-            // Si encontramos WhatsApp pero no teléfono en la DB, podríamos actualizarlo acá también (opcional)
-            
-            await pool.query(`
-                UPDATE leads_agro 
-                SET email = $1, detalle_personalizado = $2, estado = $3
-                WHERE id = $4
-            `, [emailFinal, detalle, nuevoEstado, lead.id]);
-
-        } catch (err) {
-            console.log(`   ❌ Error: ${err.message}`);
-            // ACÁ ESTÁ EL ARREGLO: Si falla, marcamos como 'error_web' para no volver a intentar mañana
-            await pool.query(`UPDATE leads_agro SET estado = 'error_web' WHERE id = $1`, [lead.id]);
+    for (let i = 0; i < leads.length; i++) {
+        let lead = leads[i];
+        
+        // 🚨 CHEQUEO DE TIEMPO (Emergency Brake)
+        if ((Date.now() - tiempoInicio) > tiempoLimiteMs) {
+            console.log("🛑 ¡TIEMPO MÁXIMO AGOTADO! Cerrando proceso para evitar cuelgues...");
+            break; 
         }
 
-        // Pausa de cortesía
-        await new Promise(r => setTimeout(r, 2000));
+        console.log(`\n[${i + 1}/${leads.length}] Procesando: ${lead.nombre_empresa || lead.nombre_negocio}...`);
+
+        // --- 📍 LÓGICA DE UBICACIÓN (Nuevo) ---
+        // Prioridad: Ciudad -> Provincia -> "su zona"
+        let ubicacion = "su zona";
+        if (lead.ciudad) {
+            ubicacion = lead.ciudad; // Ej: "Villa Mercedes"
+        } else if (lead.provincia) {
+            ubicacion = lead.provincia; // Ej: "San Luis"
+        }
+        // Capitalizamos la ubicación por estética
+        ubicacion = ubicacion.charAt(0).toUpperCase() + ubicacion.slice(1);
+
+        let mensaje = "";
+
+        // Estrategia: Investigar Web
+        if (lead.website) {
+            try {
+                const url = lead.website.startsWith('http') ? lead.website : `http://${lead.website}`;
+                
+                // Usamos el TIMEOUT configurado
+                await page.goto(url, { waitUntil: 'domcontentloaded', timeout: CONFIG.TIMEOUT_PAGINA });
+                
+                const text = await page.evaluate(() => document.body.innerText.toLowerCase());
+
+                // Lógica de Ganchos (Hooks) con Ubicación
+                if (text.includes("silo") || text.includes("acopio") || text.includes("cereal")) {
+                    mensaje = `Hola ${lead.nombre_empresa}, vi que tienen planta en ${ubicacion}. Queríamos comentarles sobre una solución para bajar costos de energía en los silos. ¿Les podría enviar info?`;
+                } else if (text.includes("feedlot") || text.includes("ganad") || text.includes("hacienda")) {
+                    mensaje = `Hola gente de ${lead.nombre_empresa}, vi sus instalaciones en ${ubicacion}. Tenemos un sistema de bombeo solar ideal para aguadas que ahorra mucho combustible. ¿Les interesa ver un caso de éxito?`;
+                } else {
+                    mensaje = `Hola ${lead.nombre_empresa}, estuve viendo su web y vi que están en ${ubicacion}. Somos Hidrosolar, ayudamos a empresas del agro a reducir costos eléctricos. ¿Con quién podría hablar del tema energía?`;
+                }
+            } catch (e) {
+                console.log(`   ⚠️ Web lenta o inaccesible (Timeout de ${CONFIG.TIMEOUT_PAGINA}ms). Usando genérico.`);
+                mensaje = `Hola ${lead.nombre_empresa}, los encontré en la guía de empresas de ${ubicacion}. Somos Hidrosolar, especialistas en energía para el agro. ¿Les podría dejar una breve presentación?`;
+            }
+        } else {
+            mensaje = `Hola ${lead.nombre_empresa}, te escribo porque trabajamos con varios campos en la zona de ${ubicacion}. Somos Hidrosolar. ¿Te podría comentar brevemente cómo bajar costos de energía en el campo?`;
+        }
+
+        // Generar Link
+        const telefonoLimpio = formatearParaWhatsapp(lead.telefono);
+        const linkFinal = `https://wa.me/${telefonoLimpio}?text=${encodeURIComponent(mensaje)}`;
+
+        // Guardar en DB
+        await pool.query(
+            "UPDATE leads SET link_whatsapp = $1, notas_hook = $2 WHERE id = $3",
+            [linkFinal, mensaje, lead.id]
+        );
+        console.log(`   ✅ Link generado.`);
+
+        // 🐢 PAUSA RESPIRATORIA (Configurable)
+        await new Promise(r => setTimeout(r, CONFIG.ESPERA_ENTRE_LEADS));
     }
 
-    console.log("\n🏁 Proceso terminado.");
     await browser.close();
-}
-
-cazarLeads();
+    await pool.end();
+    
+    const tiempoTotal = ((Date.now() - tiempoInicio) / 1000).toFixed(1);
+    console.log(`\n🏁 Fin del turno. Tiempo total: ${tiempoTotal} segundos.`);
+})();

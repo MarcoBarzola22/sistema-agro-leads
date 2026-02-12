@@ -18,3 +18,4 @@ CREATE TABLE IF NOT EXISTS leads_agro (
     estado VARCHAR(50) DEFAULT 'nuevo', -- nuevo, enriquecido, error_web, etc.
     fecha_captura TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
